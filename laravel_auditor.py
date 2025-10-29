@@ -233,8 +233,8 @@ class AnimatedTabWidget(QTabWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f"Laravel Auditor v{__version__} – by {__author__}")
-        self.setGeometry(100, 100, 1200, 700)
+        self.setWindowTitle(f"🔒 Laravel Auditor v{__version__} – by {__author__}")
+        self.setGeometry(100, 100, 1300, 750)
         self.reports: List[Dict] = []
         self.dark_mode = True
         self.init_ui()
@@ -244,7 +244,8 @@ class MainWindow(QMainWindow):
         toolbar = QToolBar()
         self.addToolBar(toolbar)
 
-        self.theme_btn = QPushButton()
+        self.theme_btn = QPushButton("🌙 Dark" if self.dark_mode else "☀️ Light")
+        self.theme_btn.setText("🌙 Dark" if self.dark_mode else "☀️ Light")
         self.theme_btn.setIcon(qta.icon("fa5s.moon" if self.dark_mode else "fa5s.sun"))
         self.theme_btn.setToolTip("Toggle Dark/Light Mode")
         self.theme_btn.clicked.connect(self.toggle_theme)
@@ -451,43 +452,68 @@ class MainWindow(QMainWindow):
         report = self.reports[selected]
 
         dialog = QDialog(self)
-        dialog.setWindowTitle(f"Details for {report['Target']}")
-        dialog.setGeometry(200, 200, 600, 400)
+        dialog.setWindowTitle(f"🔍 Details for {report['Target']}")
+        dialog.setGeometry(200, 200, 700, 500)
+        dialog.setModal(True)
 
         layout = QVBoxLayout()
 
+        # Header with icon
+        header_layout = QHBoxLayout()
+        icon_label = QLabel()
+        icon_label.setPixmap(qta.icon("fa5s.shield-alt", color="#007bff").pixmap(32, 32))
+        header_layout.addWidget(icon_label)
+        header_layout.addWidget(QLabel(f"<h2>Scan Details</h2>"))
+        header_layout.addStretch()
+        layout.addLayout(header_layout)
+
         text_edit = QTextEdit()
         text_edit.setReadOnly(True)
+        text_edit.setFont(QFont("Consolas", 10))
 
-        details = f"Target: {report['Target']}\n"
-        details += f"Type: {report['Type']}\n"
-        details += f"Time: {report['Time']}\n"
-        details += f"Laravel Detected: {'Yes' if report.get('Laravel') else 'No'}\n"
+        details = f"<b>Target:</b> {report['Target']}<br>"
+        details += f"<b>Type:</b> {report['Type']}<br>"
+        details += f"<b>Time:</b> {report['Time']}<br>"
+        details += f"<b>Laravel Detected:</b> {'✅ Yes' if report.get('Laravel') else '❌ No'}<br>"
         if report.get('Laravel version'):
-            details += f"Laravel Version: {report['Laravel version']}\n"
+            details += f"<b>Laravel Version:</b> {report['Laravel version']}<br>"
         if report.get('PHP version'):
-            details += f"PHP Version: {report['PHP version']}\n"
+            details += f"<b>PHP Version:</b> {report['PHP version']}<br>"
         if report.get('.env exposure'):
-            details += f".env Exposure: {report['.env exposure']}\n"
-        details += f"Risk Score: {report.get('Risk', 0)}/100\n\n"
+            details += f"<b>.env Exposure:</b> {report['.env exposure']}<br>"
+        risk = report.get('Risk', 0)
+        risk_color = "#28a745" if risk < 30 else "#ffc107" if risk < 50 else "#dc3545"
+        details += f"<b>Risk Score:</b> <span style='color: {risk_color}; font-weight: bold;'>{risk}/100</span><br><br>"
 
         if report.get('Issues'):
-            details += "Issues:\n"
+            details += "<h3 style='color: #dc3545;'>⚠️ Issues:</h3><ul>"
             for issue in report['Issues']:
-                details += f"- {issue}\n"
-            details += "\n"
+                details += f"<li>{issue}</li>"
+            details += "</ul><br>"
 
         if report.get('Suggestions'):
-            details += "Suggestions:\n"
+            details += "<h3 style='color: #28a745;'>💡 Suggestions:</h3><ul>"
             for suggestion in report['Suggestions']:
-                details += f"- {suggestion}\n"
+                details += f"<li>{suggestion}</li>"
+            details += "</ul>"
 
-        text_edit.setPlainText(details)
+        text_edit.setHtml(details)
         layout.addWidget(text_edit)
 
-        close_btn = QPushButton("Close")
+        # Buttons
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+
+        export_btn = QPushButton("📄 Export Details")
+        export_btn.clicked.connect(lambda: self.export_details(report))
+        button_layout.addWidget(export_btn)
+
+        close_btn = QPushButton("❌ Close")
+        close_btn.setDefault(True)
         close_btn.clicked.connect(dialog.accept)
-        layout.addWidget(close_btn)
+        button_layout.addWidget(close_btn)
+
+        layout.addLayout(button_layout)
 
         dialog.setLayout(layout)
         dialog.exec()
@@ -544,6 +570,37 @@ class MainWindow(QMainWindow):
                     "Risk": r.get("Risk", 0)
                 })
 
+    def export_details(self, report):
+        path, _ = QFileDialog.getSaveFileName(self, "Export Details", "", "Text Files (*.txt);;All Files (*)")
+        if not path: return
+        with open(path, "w") as f:
+            f.write(f"Scan Details for {report['Target']}\n")
+            f.write("=" * 50 + "\n\n")
+            f.write(f"Target: {report['Target']}\n")
+            f.write(f"Type: {report['Type']}\n")
+            f.write(f"Time: {report['Time']}\n")
+            f.write(f"Laravel Detected: {'Yes' if report.get('Laravel') else 'No'}\n")
+            if report.get('Laravel version'):
+                f.write(f"Laravel Version: {report['Laravel version']}\n")
+            if report.get('PHP version'):
+                f.write(f"PHP Version: {report['PHP version']}\n")
+            if report.get('.env exposure'):
+                f.write(f".env Exposure: {report['.env exposure']}\n")
+            f.write(f"Risk Score: {report.get('Risk', 0)}/100\n\n")
+
+            if report.get('Issues'):
+                f.write("Issues:\n")
+                for issue in report['Issues']:
+                    f.write(f"- {issue}\n")
+                f.write("\n")
+
+            if report.get('Suggestions'):
+                f.write("Suggestions:\n")
+                for suggestion in report['Suggestions']:
+                    f.write(f"- {suggestion}\n")
+
+        QMessageBox.information(self, "Export Successful", f"Details exported to {path}")
+
     def toggle_theme(self):
         self.dark_mode = not self.dark_mode
         self.apply_theme()
@@ -553,17 +610,50 @@ class MainWindow(QMainWindow):
         app = QApplication.instance()
         if self.dark_mode:
             palette = QPalette()
-            palette.setColor(QPalette.ColorRole.Window, QColor(30, 30, 30))
-            palette.setColor(QPalette.ColorRole.WindowText, QColor(255, 255, 255))
-            palette.setColor(QPalette.ColorRole.Base, QColor(45, 45, 45))
-            palette.setColor(QPalette.ColorRole.Text, QColor(255, 255, 255))
-            palette.setColor(QPalette.ColorRole.Button, QColor(50, 50, 50))
-            palette.setColor(QPalette.ColorRole.ButtonText, QColor(255, 255, 255))
+            palette.setColor(QPalette.ColorRole.Window, QColor(25, 25, 35))
+            palette.setColor(QPalette.ColorRole.WindowText, QColor(220, 220, 220))
+            palette.setColor(QPalette.ColorRole.Base, QColor(35, 35, 45))
+            palette.setColor(QPalette.ColorRole.Text, QColor(220, 220, 220))
+            palette.setColor(QPalette.ColorRole.Button, QColor(45, 45, 55))
+            palette.setColor(QPalette.ColorRole.ButtonText, QColor(220, 220, 220))
+            palette.setColor(QPalette.ColorRole.Highlight, QColor(0, 123, 255))
+            palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
             app.setPalette(palette)
-            app.setStyleSheet("QToolTip { color: white; background: #333; border: 1px solid #555; }")
+            app.setFont(QFont("Segoe UI", 10))
+            app.setStyleSheet("""
+                QToolTip { color: white; background: #333; border: 1px solid #555; border-radius: 4px; padding: 4px; }
+                QPushButton { border-radius: 6px; padding: 8px 16px; font-weight: 500; }
+                QPushButton:hover { background-color: #4a4a5a; }
+                QPushButton:pressed { background-color: #3a3a4a; }
+                QLineEdit { border-radius: 4px; padding: 6px; border: 1px solid #555; }
+                QLineEdit:focus { border-color: #007bff; }
+                QTableWidget { gridline-color: #444; border-radius: 6px; }
+                QTableWidget::item { padding: 8px; }
+                QTableWidget::item:selected { background-color: #007bff; }
+                QTabWidget::pane { border: 1px solid #444; border-radius: 6px; }
+                QTabBar::tab { padding: 10px 20px; margin-right: 2px; border-radius: 6px 6px 0 0; }
+                QTabBar::tab:selected { background-color: #007bff; color: white; }
+                QProgressBar { border-radius: 4px; text-align: center; }
+                QProgressBar::chunk { background-color: #007bff; border-radius: 4px; }
+            """)
         else:
             app.setPalette(app.style().standardPalette())
-            app.setStyleSheet("")
+            app.setFont(QFont("Segoe UI", 10))
+            app.setStyleSheet("""
+                QPushButton { border-radius: 6px; padding: 8px 16px; font-weight: 500; }
+                QPushButton:hover { background-color: #e9ecef; }
+                QPushButton:pressed { background-color: #dee2e6; }
+                QLineEdit { border-radius: 4px; padding: 6px; border: 1px solid #ced4da; }
+                QLineEdit:focus { border-color: #007bff; box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25); }
+                QTableWidget { border-radius: 6px; }
+                QTableWidget::item { padding: 8px; }
+                QTableWidget::item:selected { background-color: #007bff; color: white; }
+                QTabWidget::pane { border: 1px solid #dee2e6; border-radius: 6px; }
+                QTabBar::tab { padding: 10px 20px; margin-right: 2px; border-radius: 6px 6px 0 0; }
+                QTabBar::tab:selected { background-color: #007bff; color: white; }
+                QProgressBar { border-radius: 4px; text-align: center; }
+                QProgressBar::chunk { background-color: #007bff; border-radius: 4px; }
+            """)
 
 # ======================================================================
 # MAIN ENTRY
