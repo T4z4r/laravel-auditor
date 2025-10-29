@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLineEdit, QLabel, QTableWidget, QTableWidgetItem,
     QTabWidget, QFileDialog, QMessageBox, QProgressBar, QHeaderView,
-    QToolBar, QStatusBar, QComboBox, QGraphicsOpacityEffect
+    QToolBar, QStatusBar, QComboBox, QGraphicsOpacityEffect, QDialog, QTextEdit
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QEasingCurve, QTimer, QPropertyAnimation
 from PyQt6.QtGui import QIcon, QFont, QDesktopServices, QPalette, QColor
@@ -83,12 +83,31 @@ class WebScanner:
 
         if not r["Laravel"]:
             r["Note"] = "No Laravel detected"
+            r["Issues"] = []
+            r["Suggestions"] = []
             return r
 
         r["Laravel version"] = self._version()
         r["PHP version"] = self._php()
         r[".env exposure"] = self._env()
         r["Risk"] = self._risk(r)
+        r["Issues"] = []
+        r["Suggestions"] = []
+
+        # Collect issues and suggestions
+        if "EXPOSED" in r.get(".env exposure", ""):
+            r["Issues"].append(".env file is exposed, potentially leaking sensitive information.")
+            r["Suggestions"].append("Move .env file outside the web root directory and ensure proper access restrictions.")
+        if r.get("Laravel version") != "Hidden":
+            r["Issues"].append("Laravel version is disclosed, which could aid attackers.")
+            r["Suggestions"].append("Disable version disclosure in production by removing or securing debug endpoints.")
+        if r.get("PHP version") != "Hidden":
+            r["Issues"].append("PHP version is disclosed.")
+            r["Suggestions"].append("Configure server to hide PHP version in headers.")
+        if r["Risk"] >= 50:
+            r["Issues"].append("High risk score indicates multiple vulnerabilities.")
+            r["Suggestions"].append("Review and address all identified issues immediately.")
+
         return r
 
     def _version(self):
@@ -140,6 +159,8 @@ class FileScanner:
 
         if not (self.root / "artisan").exists() and not (self.root / "composer.json").exists():
             r["Note"] = "Not Laravel"
+            r["Issues"] = []
+            r["Suggestions"] = []
             return r
 
         r["Laravel"] = True
@@ -147,6 +168,20 @@ class FileScanner:
         r["PHP version"] = os.popen("php -v 2>/dev/null | head -n1").read().strip() or "Unknown"
         r[".env exposure"] = self._env_check()
         r["Risk"] = self._risk(r)
+        r["Issues"] = []
+        r["Suggestions"] = []
+
+        # Collect issues and suggestions
+        if "WORLD-READABLE" in r.get(".env exposure", ""):
+            r["Issues"].append(".env file is world-readable, exposing sensitive data.")
+            r["Suggestions"].append("Change file permissions to restrict access (e.g., chmod 600 .env).")
+        if r.get("Laravel version") == "unknown":
+            r["Issues"].append("Laravel version could not be determined.")
+            r["Suggestions"].append("Ensure composer.json is present and up-to-date.")
+        if r["Risk"] >= 50:
+            r["Issues"].append("High risk score indicates potential security issues.")
+            r["Suggestions"].append("Review file permissions, update dependencies, and follow Laravel security best practices.")
+
         return r
 
     def _laravel_version(self):
@@ -304,6 +339,11 @@ class MainWindow(QMainWindow):
         self.table.itemDoubleClicked.connect(self.open_url)
         layout.addWidget(self.table)
 
+        details_btn = QPushButton("View Details")
+        details_btn.setIcon(qta.icon("fa5s.info-circle"))
+        details_btn.clicked.connect(self.show_details)
+        layout.addWidget(details_btn)
+
         tab.setLayout(layout)
         return tab
 
@@ -402,6 +442,55 @@ class MainWindow(QMainWindow):
             url = item.data(Qt.ItemDataRole.UserRole)
             if url:
                 QDesktopServices.openUrl(QUrl(url))
+
+    def show_details(self):
+        selected = self.table.currentRow()
+        if selected < 0 or selected >= len(self.reports):
+            QMessageBox.information(self, "No Selection", "Please select a report row to view details.")
+            return
+        report = self.reports[selected]
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Details for {report['Target']}")
+        dialog.setGeometry(200, 200, 600, 400)
+
+        layout = QVBoxLayout()
+
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+
+        details = f"Target: {report['Target']}\n"
+        details += f"Type: {report['Type']}\n"
+        details += f"Time: {report['Time']}\n"
+        details += f"Laravel Detected: {'Yes' if report.get('Laravel') else 'No'}\n"
+        if report.get('Laravel version'):
+            details += f"Laravel Version: {report['Laravel version']}\n"
+        if report.get('PHP version'):
+            details += f"PHP Version: {report['PHP version']}\n"
+        if report.get('.env exposure'):
+            details += f".env Exposure: {report['.env exposure']}\n"
+        details += f"Risk Score: {report.get('Risk', 0)}/100\n\n"
+
+        if report.get('Issues'):
+            details += "Issues:\n"
+            for issue in report['Issues']:
+                details += f"- {issue}\n"
+            details += "\n"
+
+        if report.get('Suggestions'):
+            details += "Suggestions:\n"
+            for suggestion in report['Suggestions']:
+                details += f"- {suggestion}\n"
+
+        text_edit.setPlainText(details)
+        layout.addWidget(text_edit)
+
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(dialog.accept)
+        layout.addWidget(close_btn)
+
+        dialog.setLayout(layout)
+        dialog.exec()
 
     def export_selected(self, idx):
         if idx <= 0 or not self.reports: return
