@@ -71,7 +71,7 @@ class WebScanner:
         try:
             return self.session.get(self.url + "/" + path.lstrip("/"), allow_redirects=True)
         except:
-            return type("obj", (), {"ok": False, "text": "", "status_code": 0, "headers": {}})
+            return type("obj", (), {"ok": False, "text": "", "status_code": 0, "headers": {}, "cookies": []})
 
     def scan(self) -> Dict:
         r = {"Target": self.url, "Type": "Web", "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
@@ -364,18 +364,6 @@ class MainWindow(QMainWindow):
         r = self.reports[0]
         risk = r.get("Risk", 0)
 
-        for col in range(7):
-            item = QTableWidgetItem()
-            effect = QGraphicsOpacityEffect()
-            item.setGraphicsEffect(effect)
-            anim = QPropertyAnimation(effect, b"opacity")
-            anim.setDuration(600)
-            anim.setStartValue(0)
-            anim.setEndValue(1)
-            anim.setEasingCurve(QEasingCurve.Type.OutQuad)
-            anim.start()
-            self.table.setItem(0, col, item)
-
         self.table.setItem(0, 0, QTableWidgetItem(r["Time"]))
         self.table.setItem(0, 1, QTableWidgetItem(r["Type"]))
         target_item = QTableWidgetItem(r["Target"])
@@ -400,13 +388,8 @@ class MainWindow(QMainWindow):
         self.table.setItem(0, 6, risk_item)
 
     def pulse_risk_item(self, item):
-        effect = QGraphicsOpacityEffect()
-        item.setGraphicsEffect(effect)
-        pulse = QPropertyAnimation(effect, b"opacity")
-        pulse.setDuration(800)
-        pulse.setKeyValues([(0, 1.0), (0.5, 0.6), (1.0, 1.0)])
-        pulse.setLoopCount(2)
-        pulse.start()
+        # Animation removed as QTableWidgetItem does not support graphics effects
+        pass
 
     def pulse_status(self):
         anim = QPropertyAnimation(self.status, b"windowOpacity")
