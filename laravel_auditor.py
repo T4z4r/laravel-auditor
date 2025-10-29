@@ -20,10 +20,9 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLineEdit, QLabel, QTableWidget, QTableWidgetItem,
     QTabWidget, QFileDialog, QMessageBox, QProgressBar, QHeaderView,
-    QToolBar, QStatusBar, QComboBox, QGraphicsOpacityEffect,
-    QPropertyAnimation, QParallelAnimationGroup, QSequentialAnimationGroup
+    QToolBar, QStatusBar, QComboBox, QGraphicsOpacityEffect
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QEasingCurve, QTimer
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QEasingCurve, QTimer, QPropertyAnimation
 from PyQt6.QtGui import QIcon, QFont, QDesktopServices, QPalette, QColor
 import qtawesome as qta
 from jinja2 import Template
